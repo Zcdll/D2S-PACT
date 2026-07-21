@@ -15,7 +15,6 @@ The framework reconstructs the same sparse PACT measurements using Fourier-domai
 ## Numerical Phantom Data
 
 The data provided in `data/` are the **Numerical Phantom** data used for the simulation experiment. 
-`sensor_signal.npz` is a compressed NumPy archive containing the simulated PA signal under the `signals` key. The stored array has shape `(4096, 2048)`, uses `float32`, and is approximately 6.1 MiB. `sensor_location.txt` contains the corresponding hemispherical detector coordinates.
 
 ![Numerical Phantom reconstruction results](figure/Numerical_Phantom.png)
 
