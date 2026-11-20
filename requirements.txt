@@ -1,5 +1,11 @@
+# Python 3.9+. Install the appropriate CUDA build of PyTorch first (see README.md).
 numpy==1.26.4
 scipy==1.13.1
 matplotlib==3.9.2
 gapat==1.1.0
-torch_harmonics==0.8.0
+
+# Frangi vesselness filtering
+scikit-image==0.24.0
+
+# PnP-BM4D denoising
+bm4d==4.2.5
