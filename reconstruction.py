@@ -10,8 +10,6 @@ from pathlib import Path
 import numpy as np
 import scipy.integrate
 import torch
-from gapat.algorithms import recon
-from gapat.processings import negetive_processing
 from scipy.special import sph_harm, spherical_jn, spherical_yn
 
 
@@ -29,6 +27,27 @@ SPHERICAL_HARMONIC_ORDER = 85
 VIRTUAL_DIRECTIONS = 15000
 A2A_SAMPLE_SIZE = 800
 SIGNAL_ARCHIVE_KEY = "signals"
+
+
+def normalize_volume(volume: np.ndarray) -> np.ndarray:
+    """Zero negative voxels, then min-max normalize the entire 3D volume.
+
+    Constant volumes become zero. Measurement waveforms are not processed here.
+    The input is never modified; the returned array is contiguous float32.
+    """
+    if np.iscomplexobj(volume):
+        raise ValueError("Volume normalization requires real-valued input.")
+    array = np.array(volume, dtype=np.float32, copy=True, order="C")
+    if array.ndim != 3 or array.size == 0 or not np.isfinite(array).all():
+        raise ValueError("Expected a finite, nonempty 3D volume.")
+    np.maximum(array, 0, out=array)
+    low, high = float(array.min()), float(array.max())
+    if high <= low:
+        array.fill(0)
+    else:
+        array -= low
+        array /= high - low
+    return array
 
 
 def load_measurements(
@@ -272,7 +291,7 @@ def reconstruct_fdm(
     virtual_directions: int = VIRTUAL_DIRECTIONS,
     device_name: str = "cuda",
 ) -> tuple[np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    """Reconstruct a 3D volume using the spherical Fourier-domain method."""
+    """Return the aligned FDM magnitude with whole-volume [0, 1] normalization."""
     device = torch.device(
         "cuda" if torch.cuda.is_available() and device_name == "cuda" else "cpu"
     )
@@ -397,14 +416,16 @@ def reconstruct_fdm(
         np.linspace(-fov_size[1] / 2, fov_size[1] / 2, size_y),
         np.linspace(-fov_size[2] / 2, fov_size[2] / 2, size_z),
     )
-    return volume, axes
+    return normalize_volume(volume), axes
 
 
-def reconstruct_ubp(
+def reconstruct_ubp_raw(
     signal_data: np.ndarray,
     probe_coordinates: np.ndarray,
 ) -> np.ndarray:
-    """Reconstruct a 3D volume using GAPAT universal back-projection."""
+    """Return signed GAPAT UBP values for method-specific input normalization."""
+    from gapat.algorithms import recon
+
     volume = recon(
         signal_data,
         probe_coordinates,
@@ -419,7 +440,15 @@ def reconstruct_ubp(
         method="ubp",
         device="gpu",
     )
-    return negetive_processing(volume, method="zero")
+    return np.asarray(volume, dtype=np.float32)
+
+
+def reconstruct_ubp(
+    signal_data: np.ndarray,
+    probe_coordinates: np.ndarray,
+) -> np.ndarray:
+    """Return a nonnegative, whole-volume normalized GAPAT UBP reconstruction."""
+    return normalize_volume(reconstruct_ubp_raw(signal_data, probe_coordinates))
 
 
 def reconstruct_dual_domain(
